@@ -14,6 +14,7 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import { OpenOrders, TokenInstructions } from '@project-serum/serum';
+import { decompressSync } from 'cppzst';
 import { I80F48, ONE_I80F48 } from './fixednum';
 import MangoGroup from './MangoGroup';
 import { HealthType } from './MangoAccount';
@@ -297,7 +298,7 @@ export async function getFilteredProgramAccounts(
     {
       commitment: connection.commitment,
       filters,
-      encoding: 'base64',
+      encoding: 'base64+zstd',
     },
   ]);
   if (resp.error) {
@@ -307,7 +308,7 @@ export async function getFilteredProgramAccounts(
     ({ pubkey, account: { data, executable, owner, lamports } }) => ({
       publicKey: new PublicKey(pubkey),
       accountInfo: {
-        data: Buffer.from(data[0], 'base64'),
+        data: decompressSync(Buffer.from(data[0], 'base64')),
         executable,
         owner: new PublicKey(owner),
         lamports,
@@ -339,7 +340,11 @@ export async function getMultipleAccounts(
   // load connection commitment as a default
   commitment ||= connection.commitment;
 
-  const args = commitment ? [publicKeyStrs, { commitment }] : [publicKeyStrs];
+  const opts = {
+      encoding: 'base64+zstd',
+      commitment: commitment,
+  };
+  const args = [publicKeyStrs, opts];
   // @ts-ignore
   const resp = await connection._rpcRequest('getMultipleAccounts', args);
   if (resp.error) {
@@ -350,7 +355,7 @@ export async function getMultipleAccounts(
       publicKey: publicKeys[i],
       context: resp.result.context,
       accountInfo: {
-        data: Buffer.from(data[0], 'base64'),
+        data: decompressSync(Buffer.from(data[0], 'base64')),
         executable,
         owner: new PublicKey(owner),
         lamports,
